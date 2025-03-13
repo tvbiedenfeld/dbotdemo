@@ -1,4 +1,4 @@
-name: Dependabot Auto-Approve und Merge (mit fetch-metadata)
+name: Dependabot Auto-Approve and Merge
 
 on:
   schedule:
