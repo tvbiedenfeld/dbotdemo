@@ -2,7 +2,7 @@ name: Dependabot Auto-Approve and Merge
 
 on:
   schedule:
-    - cron: '99 * * * *'  # Alle 5 Minuten
+    - cron: '*/5 * * * *'  # Stündlich ausführen
 
 jobs:
   auto-approve-merge:
@@ -10,23 +10,19 @@ jobs:
     permissions:
       pull-requests: write
       contents: write
-      issues: write
     steps:
       - name: Repository auschecken
         uses: actions/checkout@v4
-        
-      - name: Aktuelle Uhrzeit anzeigen
-        run: echo "Die aktuelle Uhrzeit ist $(date)"
-      
+
       - name: Bei GitHub anmelden
         run: echo "${{ secrets.GITHUB_TOKEN }}" | gh auth login --with-token
-          
+
       - name: Dependabot PRs finden und verarbeiten
         run: |
           echo "Suche nach Dependabot PRs..."
           
           # Liste aller offenen PRs von Dependabot mit Titel und Nummer
-          dependabot_prs=$(gh pr list --author "dependabot[bot]" --json number,title --jq '.')
+          dependabot_prs=$(gh pr list --author "dependabot[bot]" --json number,title,body --jq '.')
           
           if [ -z "$dependabot_prs" ]; then
             echo "Keine offenen Dependabot PRs gefunden."
@@ -39,6 +35,7 @@ jobs:
           echo "$dependabot_prs" | jq -c '.[]' | while read -r pr; do
             pr_number=$(echo "$pr" | jq -r '.number')
             pr_title=$(echo "$pr" | jq -r '.title')
+            pr_body=$(echo "$pr" | jq -r '.body')
             
             echo "Prüfe PR #$pr_number: $pr_title"
             
@@ -49,8 +46,6 @@ jobs:
             fi
             
             # Prüfe Dependabot-Metadaten für genauere Versionsinformationen
-            pr_body=$(gh pr view "$pr_number" --json body --jq '.body')
-            
             if [[ "$pr_body" =~ "BREAKING CHANGE" ]] || [[ "$pr_body" =~ "Major version change" ]]; then
               echo "PR #$pr_number enthält Breaking Changes. Wird übersprungen."
               continue
@@ -58,15 +53,29 @@ jobs:
             
             echo "PR #$pr_number ist ein Minor- oder Patch-Update. Wird verarbeitet."
             
-            # Workflow für diesen spezifischen PR starten
-            echo "Starte Workflow für PR #$pr_number"
-            gh workflow run process-single-pr.yml -f pr_number=$pr_number
+            # PR-Informationen abrufen
+            pr_info=$(gh pr view $pr_number --json state,mergeable,mergeStateStatus,reviewDecision)
             
-            # Überprüfen, ob der Workflow gestartet wurde
-            if [ $? -eq 0 ]; then
-              echo "Workflow für PR #$pr_number erfolgreich gestartet"
+            # Werte extrahieren
+            state=$(echo "$pr_info" | jq -r '.state')
+            mergeable=$(echo "$pr_info" | jq -r '.mergeable')
+            review_decision=$(echo "$pr_info" | jq -r '.reviewDecision')
+            
+            if [ "$state" != "OPEN" ]; then
+              echo "PR ist nicht offen. Überspringe."
+              continue
+            fi
+            
+            # PR genehmigen
+            echo "Genehmige PR #$pr_number..."
+            gh pr review $pr_number --approve -b "Automatisch genehmigt durch Workflow (Minor/Patch Update)."
+            
+            # PR mergen, wenn möglich
+            if [ "$mergeable" == "true" ] && ([ "$review_decision" == "APPROVED" ] || [ "$review_decision" == "null" ]); then
+              echo "Merge PR #$pr_number..."
+              gh pr merge $pr_number --auto --squash
             else
-              echo "Konnte Workflow für PR #$pr_number nicht starten"
+              echo "PR #$pr_number ist nicht bereit zum Mergen (mergeable: $mergeable, review: $review_decision)"
             fi
           done
         env:
