@@ -12,6 +12,9 @@ jobs:
       contents: write
       issues: write
     steps:
+      - name: Repository auschecken
+        uses: actions/checkout@v4
+        
       - name: Aktuelle Uhrzeit anzeigen
         run: echo "Die aktuelle Uhrzeit ist $(date)"
       
@@ -65,4 +68,4 @@ jobs:
             fi
           done
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}  # Beachte: GH_TOKEN statt GITHUB_TOKEN
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
