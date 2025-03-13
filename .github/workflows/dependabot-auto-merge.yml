@@ -59,10 +59,12 @@ jobs:
             echo "PR #$pr_number ist ein Minor- oder Patch-Update. Wird verarbeitet."
             
             # Workflow für diesen spezifischen PR starten
-            workflow_run_id=$(gh workflow run process-single-pr.yml -f pr_number=$pr_number --json id --jq '.id')
+            echo "Starte Workflow für PR #$pr_number"
+            gh workflow run process-single-pr.yml -f pr_number=$pr_number
             
-            if [ -n "$workflow_run_id" ]; then
-              echo "Workflow für PR #$pr_number gestartet (ID: $workflow_run_id)"
+            # Überprüfen, ob der Workflow gestartet wurde
+            if [ $? -eq 0 ]; then
+              echo "Workflow für PR #$pr_number erfolgreich gestartet"
             else
               echo "Konnte Workflow für PR #$pr_number nicht starten"
             fi
