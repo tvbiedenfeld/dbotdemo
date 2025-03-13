@@ -2,7 +2,7 @@ name: Dependabot Auto-Approve and Merge
 
 on:
   schedule:
-    - cron: '0 * * * *'  # Stündlich ausführen
+    - cron: '5 * * * *'  # Stündlich ausführen
 
 jobs:
   auto-approve-merge:
@@ -53,29 +53,35 @@ jobs:
             
             echo "PR #$pr_number ist ein Minor- oder Patch-Update. Wird verarbeitet."
             
-            # PR-Informationen abrufen
-            pr_info=$(gh pr view $pr_number --json state,mergeable,mergeStateStatus,reviewDecision)
-            
-            # Werte extrahieren
-            state=$(echo "$pr_info" | jq -r '.state')
-            mergeable=$(echo "$pr_info" | jq -r '.mergeable')
-            review_decision=$(echo "$pr_info" | jq -r '.reviewDecision')
-            
-            if [ "$state" != "OPEN" ]; then
-              echo "PR ist nicht offen. Überspringe."
-              continue
-            fi
-            
             # PR genehmigen
             echo "Genehmige PR #$pr_number..."
             gh pr review $pr_number --approve -b "Automatisch genehmigt durch Workflow (Minor/Patch Update)."
             
+            # Kurz warten, damit GitHub den Status aktualisieren kann
+            sleep 5
+            
+            # PR-Status erneut abrufen (mit Debug-Output)
+            pr_info=$(gh pr view $pr_number --json state,mergeable,mergeStateStatus,reviewDecision)
+            echo "PR Info: $pr_info"
+            
+            # Werte extrahieren
+            state=$(echo "$pr_info" | jq -r '.state')
+            mergeable=$(echo "$pr_info" | jq -r '.mergeable')
+            review_decision=$(echo "$pr_info" | jq -r '.reviewDecision // "NONE"')
+            
+            echo "Status: $state, Mergeable: $mergeable, Review: $review_decision"
+            
             # PR mergen, wenn möglich
-            if [ "$mergeable" == "true" ] && ([ "$review_decision" == "APPROVED" ] || [ "$review_decision" == "null" ]); then
-              echo "Merge PR #$pr_number..."
-              gh pr merge $pr_number --auto --squash
+            if [ "$state" == "OPEN" ]; then
+              if [ "$mergeable" == "true" ] || [ "$mergeable" == "MERGEABLE" ]; then
+                echo "Merge PR #$pr_number..."
+                gh pr merge $pr_number --auto --squash
+              else
+                echo "PR #$pr_number ist noch nicht mergebar. Versuche direkten Merge-Befehl..."
+                gh pr merge $pr_number --auto --squash
+              fi
             else
-              echo "PR #$pr_number ist nicht bereit zum Mergen (mergeable: $mergeable, review: $review_decision)"
+              echo "PR #$pr_number ist nicht offen. Überspringe."
             fi
           done
         env:
