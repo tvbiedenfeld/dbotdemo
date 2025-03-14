@@ -108,9 +108,9 @@ jobs:
                   comments_count=$(echo "$comments_raw" | jq '.comments | length')
                   echo "Anzahl der Kommentare: $comments_count"
                   
-                  # Alle Kommentare anzeigen für Debugging
+                  # Alle Kommentare anzeigen für Debugging - Ohne substr, da nicht unterstützt
                   echo "Alle Kommentare:"
-                  echo "$comments_raw" | jq -r '.comments[] | "Autor: \(.author.login), Text: \(.body | substr(0, 50))"'
+                  echo "$comments_raw" | jq -r '.comments[] | "Autor: \(.author.login), Textanfang: \(.body | if length > 50 then .[:50] + "..." else . end)"'
                   
                   # Verbesserter Filter für Dependabot-Kommentare
                   dependabot_comments=$(echo "$comments_raw" | jq -r '.comments[] | select(.author.login == "dependabot[bot]") | .body')
