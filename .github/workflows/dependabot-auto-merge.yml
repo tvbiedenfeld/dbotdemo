@@ -64,7 +64,7 @@ jobs:
             mergeable="UNKNOWN"
             
             while [ "$mergeable" == "UNKNOWN" ] && [ $counter -lt $max_retries ]; do
-              sleep 5
+              sleep 10
               echo "Warte auf PR-Status (Versuch $((counter+1))/$max_retries)..."
               
               # PR-Status erneut abrufen
@@ -79,13 +79,60 @@ jobs:
             # Werte extrahieren
             state=$(echo "$pr_info" | jq -r '.state')
             review_decision=$(echo "$pr_info" | jq -r '.reviewDecision // "NONE"')
+            merge_state_status=$(echo "$pr_info" | jq -r '.mergeStateStatus')
             
-            echo "Status: $state, Mergeable: $mergeable, Review: $review_decision"
+            echo "Status: $state, Mergeable: $mergeable, Review: $review_decision, MergeState: $merge_state_status"
             
-            # PR mergen, wenn möglich
+            # PR mergen oder Konflikt beheben
             if [ "$state" == "OPEN" ]; then
-              echo "Merge PR #$pr_number..."
-              gh pr merge $pr_number --auto --squash
+              if [ "$mergeable" == "CONFLICTING" ] || [ "$merge_state_status" == "DIRTY" ] || [ "$merge_state_status" == "BLOCKED" ]; then
+                echo "PR #$pr_number hat Konflikte. Fordere Rebase an..."
+                gh pr comment $pr_number --body "@dependabot rebase"
+                
+                # Warten auf Rebase-Fertigstellung
+                echo "Warte auf Abschluss des Rebase (bis zu 5 Minuten)..."
+                rebase_success=false
+                max_rebase_wait=10  # 10 x 30s = 5 Minuten
+                rebase_counter=0
+                
+                while [ "$rebase_success" == "false" ] && [ $rebase_counter -lt $max_rebase_wait ]; do
+                  sleep 30
+                  # Prüfen, ob der Rebase-Kommentar eine Antwort bekommen hat
+                  comments=$(gh pr view $pr_number --json comments --jq '.comments')
+                  latest_bot_comment=$(echo "$comments" | jq -r '.[] | select(.author.login == "dependabot[bot]") | .body' | tail -n 1)
+                  
+                  echo "Prüfe Rebase-Status (Versuch $((rebase_counter+1))/$max_rebase_wait)..."
+                  echo "Letzter Bot-Kommentar: $latest_bot_comment"
+                  
+                  if [[ "$latest_bot_comment" == *"rebase completed successfully"* ]]; then
+                    rebase_success=true
+                    echo "Rebase erfolgreich abgeschlossen!"
+                    
+                    # PR-Status nach Rebase prüfen
+                    pr_info=$(gh pr view $pr_number --json state,mergeable,mergeStateStatus,reviewDecision)
+                    mergeable=$(echo "$pr_info" | jq -r '.mergeable')
+                    
+                    if [ "$mergeable" == "true" ] || [ "$mergeable" == "MERGEABLE" ]; then
+                      echo "PR ist nach Rebase mergebar. Starte Merge..."
+                      gh pr merge $pr_number --auto --squash
+                    else
+                      echo "PR ist nach Rebase noch nicht mergebar."
+                    fi
+                  elif [[ "$latest_bot_comment" == *"rebase failed"* ]]; then
+                    echo "Rebase ist fehlgeschlagen."
+                    break
+                  fi
+                  
+                  rebase_counter=$((rebase_counter+1))
+                done
+                
+                if [ "$rebase_success" == "false" ]; then
+                  echo "Rebase war nicht erfolgreich innerhalb des Zeitlimits."
+                fi
+              else
+                echo "Merge PR #$pr_number..."
+                gh pr merge $pr_number --auto --squash
+              fi
             else
               echo "PR #$pr_number ist nicht offen. Überspringe."
             fi
