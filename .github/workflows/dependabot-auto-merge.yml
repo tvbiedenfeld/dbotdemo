@@ -2,7 +2,7 @@ name: Dependabot Auto-Approve and Merge
 
 on:
   schedule:
-    - cron: '*/30 * * * *'  # Stündlich ausführen
+    - cron: '*/5 * * * *'  # Stündlich ausführen
     #- cron: '0 21 * * 3'
 
 jobs:
@@ -15,8 +15,8 @@ jobs:
       - name: Repository auschecken
         uses: actions/checkout@v4
 
-      - name: Bei GitHub anmelden
-        run: echo "${{ secrets.GITHUB_TOKEN }}" | gh auth login --with-token
+      - name: Bei GitHub anmelden mit PAT
+        run: echo "${{ secrets.GH_PAT }}" | gh auth login --with-token
 
       - name: Dependabot PRs finden und verarbeiten
         run: |
@@ -158,4 +158,4 @@ jobs:
             fi
           done
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ secrets.GH_PAT }}
