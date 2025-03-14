@@ -2,7 +2,7 @@ name: Dependabot Auto-Approve and Merge
 
 on:
   schedule:
-    - cron: '*/5 * * * *'  # Stündlich ausführen
+    - cron: '*/30 * * * *'  # Stündlich ausführen
     #- cron: '0 21 * * 3'
 
 jobs:
@@ -97,30 +97,50 @@ jobs:
                 
                 while [ "$rebase_success" == "false" ] && [ $rebase_counter -lt $max_rebase_wait ]; do
                   sleep 30
-                  # Prüfen, ob der Rebase-Kommentar eine Antwort bekommen hat
-                  comments=$(gh pr view $pr_number --json comments --jq '.comments')
-                  latest_bot_comment=$(echo "$comments" | jq -r '.[] | select(.author.login == "dependabot[bot]") | .body' | tail -n 1)
-                  
+                  # Debug-Ausgabe hinzufügen um zu sehen, was passiert
                   echo "Prüfe Rebase-Status (Versuch $((rebase_counter+1))/$max_rebase_wait)..."
-                  echo "Letzter Bot-Kommentar: $latest_bot_comment"
                   
-                  if [[ "$latest_bot_comment" == *"rebase completed successfully"* ]]; then
-                    rebase_success=true
-                    echo "Rebase erfolgreich abgeschlossen!"
+                  # Kommentare mit verbesserter Ausgabe abrufen
+                  comments_raw=$(gh pr view $pr_number --json comments)
+                  echo "Rohe Kommentare: $comments_raw"
+                  
+                  # Anzahl der Kommentare anzeigen
+                  comments_count=$(echo "$comments_raw" | jq '.comments | length')
+                  echo "Anzahl der Kommentare: $comments_count"
+                  
+                  # Alle Kommentare anzeigen für Debugging
+                  echo "Alle Kommentare:"
+                  echo "$comments_raw" | jq -r '.comments[] | "Autor: \(.author.login), Text: \(.body | substr(0, 50))"'
+                  
+                  # Verbesserter Filter für Dependabot-Kommentare
+                  dependabot_comments=$(echo "$comments_raw" | jq -r '.comments[] | select(.author.login == "dependabot[bot]") | .body')
+                  echo "Dependabot Kommentare: $dependabot_comments"
+                  
+                  # Neuester Kommentar mit sicherer Methode
+                  if [ -n "$dependabot_comments" ]; then
+                    latest_bot_comment=$(echo "$dependabot_comments" | tail -n 1)
+                    echo "Letzter Bot-Kommentar: $latest_bot_comment"
                     
-                    # PR-Status nach Rebase prüfen
-                    pr_info=$(gh pr view $pr_number --json state,mergeable,mergeStateStatus,reviewDecision)
-                    mergeable=$(echo "$pr_info" | jq -r '.mergeable')
-                    
-                    if [ "$mergeable" == "true" ] || [ "$mergeable" == "MERGEABLE" ]; then
-                      echo "PR ist nach Rebase mergebar. Starte Merge..."
-                      gh pr merge $pr_number --auto --squash
-                    else
-                      echo "PR ist nach Rebase noch nicht mergebar."
+                    if [[ "$latest_bot_comment" == *"rebase completed successfully"* ]]; then
+                      rebase_success=true
+                      echo "Rebase erfolgreich abgeschlossen!"
+                      
+                      # PR-Status nach Rebase prüfen
+                      pr_info=$(gh pr view $pr_number --json state,mergeable,mergeStateStatus,reviewDecision)
+                      mergeable=$(echo "$pr_info" | jq -r '.mergeable')
+                      
+                      if [ "$mergeable" == "true" ] || [ "$mergeable" == "MERGEABLE" ]; then
+                        echo "PR ist nach Rebase mergebar. Starte Merge..."
+                        gh pr merge $pr_number --auto --squash
+                      else
+                        echo "PR ist nach Rebase noch nicht mergebar."
+                      fi
+                    elif [[ "$latest_bot_comment" == *"rebase failed"* ]]; then
+                      echo "Rebase ist fehlgeschlagen."
+                      break
                     fi
-                  elif [[ "$latest_bot_comment" == *"rebase failed"* ]]; then
-                    echo "Rebase ist fehlgeschlagen."
-                    break
+                  else
+                    echo "Keine Dependabot-Kommentare gefunden."
                   fi
                   
                   rebase_counter=$((rebase_counter+1))
