@@ -110,7 +110,7 @@ jobs:
                   
                   # Alle Kommentare anzeigen für Debugging - Ohne substr, da nicht unterstützt
                   echo "Alle Kommentare:"
-                  echo "$comments_raw" | jq -r '.comments[] | "Autor: \(.author.login), Textanfang: \(.body | if length > 50 then .[:50] + "..." else . end)"'
+                  echo "$comments_raw" | jq -r '.comments[] | "\(.author.login): \(.body)"'
                   
                   # Verbesserter Filter für Dependabot-Kommentare
                   dependabot_comments=$(echo "$comments_raw" | jq -r '.comments[] | select(.author.login == "dependabot[bot]") | .body')
