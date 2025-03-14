@@ -58,29 +58,34 @@ jobs:
             echo "Genehmige PR #$pr_number..."
             gh pr review $pr_number --approve -b "Automatisch genehmigt durch Workflow (Minor/Patch Update)."
             
-            # Kurz warten, damit GitHub den Status aktualisieren kann
-            sleep 5
+            # Mehrere Versuche, um auf den aktualisierten Status zu warten
+            max_retries=5
+            counter=0
+            mergeable="UNKNOWN"
             
-            # PR-Status erneut abrufen (mit Debug-Output)
-            pr_info=$(gh pr view $pr_number --json state,mergeable,mergeStateStatus,reviewDecision)
+            while [ "$mergeable" == "UNKNOWN" ] && [ $counter -lt $max_retries ]; do
+              sleep 5
+              echo "Warte auf PR-Status (Versuch $((counter+1))/$max_retries)..."
+              
+              # PR-Status erneut abrufen
+              pr_info=$(gh pr view $pr_number --json state,mergeable,mergeStateStatus,reviewDecision)
+              mergeable=$(echo "$pr_info" | jq -r '.mergeable')
+              
+              counter=$((counter+1))
+            done
+            
             echo "PR Info: $pr_info"
             
             # Werte extrahieren
             state=$(echo "$pr_info" | jq -r '.state')
-            mergeable=$(echo "$pr_info" | jq -r '.mergeable')
             review_decision=$(echo "$pr_info" | jq -r '.reviewDecision // "NONE"')
             
             echo "Status: $state, Mergeable: $mergeable, Review: $review_decision"
             
             # PR mergen, wenn möglich
             if [ "$state" == "OPEN" ]; then
-              if [ "$mergeable" == "true" ] || [ "$mergeable" == "MERGEABLE" ]; then
-                echo "Merge PR #$pr_number..."
-                gh pr merge $pr_number --auto --squash
-              else
-                echo "PR #$pr_number ist noch nicht mergebar. Versuche direkten Merge-Befehl..."
-                gh pr merge $pr_number --auto --squash
-              fi
+              echo "Merge PR #$pr_number..."
+              gh pr merge $pr_number --auto --squash
             else
               echo "PR #$pr_number ist nicht offen. Überspringe."
             fi
