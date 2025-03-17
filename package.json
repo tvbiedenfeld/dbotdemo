@@ -10,7 +10,7 @@
         "@types/js-cookie": "^3.0.6",
         "@types/nprogress": "^0.2.3",
         "@types/object.fromentries": "^2.0.4",
-        "@vueuse/core": "^10.9.0",
+        "@vueuse/core": "^13.0.0",
         "axios": "^1.6.7",
         "dayjs": "^1.11.10",
         "js-cookie": "^3.0.1",
