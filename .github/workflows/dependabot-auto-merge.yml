@@ -2,7 +2,8 @@ name: Dependabot Auto-Approve and Merge
 
 on:
   schedule:
-    - cron: '5 */12 * * *'  # Alle 2 Stunden ausführen
+    - 0 13 * * 1 # jeden Montag um 13:00 Uhr
+    #- cron: '5 */12 * * *'  # Alle 2 Stunden ausführen
     #- cron: '0 21 * * 3'
 
 jobs:
