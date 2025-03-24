@@ -2,7 +2,8 @@ name: Dependabot Auto-Approve and Merge
 
 on:
   schedule:
-    - 0 13 * * 1 # jeden Montag um 13:00 Uhr
+    # 0 13 * * 1 # jeden Montag um 13:00 Uhr
+    - cron: '0 * * * *' # every hour
     #- cron: '5 */12 * * *'  # Alle 2 Stunden ausführen
     #- cron: '0 21 * * 3'
 
@@ -159,4 +160,4 @@ jobs:
             fi
           done
         env:
-          GH_TOKEN: ${{ secrets.GH_PAT }}
+          GH_TOKEN: ${{ secrets.GH_PAT || github.token }}
