@@ -11,7 +11,7 @@
         "@types/nprogress": "^0.2.3",
         "@types/object.fromentries": "^2.0.4",
         "@vueuse/core": "^10.9.0",
-        "axios": "^1.6.7",
+        "axios": "^1.8.4",
         "dayjs": "^1.11.10",
         "js-cookie": "^3.0.1",
         "lodash": "^4.17.21",
