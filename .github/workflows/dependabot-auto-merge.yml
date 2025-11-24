@@ -15,7 +15,7 @@ jobs:
       contents: write
     steps:
       - name: Repository auschecken
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Bei GitHub anmelden mit PAT
         run: echo "${{ secrets.GH_PAT }}" | gh auth login --with-token
